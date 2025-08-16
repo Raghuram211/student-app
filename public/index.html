@@ -1,0 +1,132 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Student Manager</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: system-ui, Arial; max-width: 900px; margin: 20px auto; padding: 0 12px; }
+    input, select, button { padding: 6px 10px; margin: 4px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background: #f4f4f4; }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .card { border: 1px solid #eee; padding: 12px; border-radius: 8px; margin: 8px 0; }
+    .muted { color:#555; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <h1>Student Manager</h1>
+
+  <div class="card">
+    <h3>Login</h3>
+    <div class="row">
+      <input id="username" placeholder="username" />
+      <input id="password" type="password" placeholder="password" />
+      <button onclick="login()">Login</button>
+      <span id="loginMsg" class="muted"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Add Student</h3>
+    <div class="row">
+      <input id="name" placeholder="name" />
+      <select id="course">
+        <option>CSE</option><option>ECE</option><option>MECH</option><option>CIVIL</option>
+      </select>
+      <label><input type="checkbox" id="active" checked /> active</label>
+      <input id="m1" type="number" placeholder="marks1 (0-100)" />
+      <input id="m2" type="number" placeholder="marks2 (0-100)" />
+      <button onclick="addStudent()">Add</button>
+      <span class="muted">GPA auto-calculated = (m1+m2)/2</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>List / Filter / Search / Sort</h3>
+    <div class="row">
+      <input id="search" placeholder="search name (e.g. ra)" />
+      <select id="fCourse">
+        <option value="">All Courses</option>
+        <option>CSE</option><option>ECE</option><option>MECH</option><option>CIVIL</option>
+      </select>
+      <input id="minGpa" type="number" step="0.1" placeholder="min GPA" />
+      <input id="maxGpa" type="number" step="0.1" placeholder="max GPA" />
+      <select id="sort">
+        <option value="id">id</option>
+        <option value="name">name</option>
+        <option value="course">course</option>
+        <option value="gpa">gpa</option>
+        <option value="marks1">marks1</option>
+        <option value="marks2">marks2</option>
+      </select>
+      <select id="order">
+        <option value="asc">asc</option>
+        <option value="desc">desc</option>
+      </select>
+      <button onclick="load()">Load</button>
+    </div>
+
+    <table id="tbl">
+      <thead><tr><th>ID</th><th>Name</th><th>Course</th><th>Active</th><th>M1</th><th>M2</th><th>GPA</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script>
+    let token = "";
+
+    async function login() {
+      const r = await fetch("/login", {
+        method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ username: document.getElementById("username").value, password: document.getElementById("password").value })
+      });
+      const data = await r.json();
+      token = data.token || "";
+      document.getElementById("loginMsg").textContent = token ? "Logged in" : (data.error || "Login failed");
+    }
+
+    async function addStudent() {
+      if (!token) return alert("Login first");
+      const body = {
+        name: document.getElementById("name").value,
+        course: document.getElementById("course").value,
+        active: document.getElementById("active").checked,
+        marks1: parseInt(document.getElementById("m1").value || "0"),
+        marks2: parseInt(document.getElementById("m2").value || "0"),
+      };
+      const r = await fetch("/students", {
+        method:"POST",
+        headers:{ "Content-Type":"application/json", "Authorization": token },
+        body: JSON.stringify(body)
+      });
+      const data = await r.json();
+      if (data.id) { alert("Added id " + data.id); load(); }
+      else alert(JSON.stringify(data));
+    }
+
+    async function load(page=1) {
+      if (!token) return alert("Login first");
+      const q = new URLSearchParams({
+        page, limit: 10,
+        search: document.getElementById("search").value,
+        course: document.getElementById("fCourse").value,
+        minGpa: document.getElementById("minGpa").value,
+        maxGpa: document.getElementById("maxGpa").value,
+        sort: document.getElementById("sort").value,
+        order: document.getElementById("order").value
+      });
+      const r = await fetch("/students?" + q.toString(), { headers:{ "Authorization": token }});
+      const arr = await r.json();
+      const tbody = document.querySelector("#tbl tbody");
+      tbody.innerHTML = "";
+      arr.forEach(s => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${s.id}</td><td>${s.name}</td><td>${s.course}</td><td>${s.active ? "Yes" : "No"}</td><td>${s.marks1}</td><td>${s.marks2}</td><td>${s.gpa}</td>`;
+        tbody.appendChild(tr);
+      });
+    }
+  </script>
+</body>
+</html>
